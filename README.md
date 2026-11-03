@@ -1,107 +1,103 @@
+<p align="center">
+  <img src="og-image.jpg" alt="Mooohla: vaquita con anteojos de sol. Cuentas claras conservan amistades" width="720">
+</p>
+
+<p align="center">
+  <b><a href="https://mmg15.github.io/Mooohla/">👉 Abrir Mooohla</a></b>
+</p>
+
 # Mooohla 🐄
 
-App para repartir gastos entre amigos (nació para la despedida de Cristian).
-El nombre mezcla *moola* (plata, en inglés) con el *mooo* de la vaca: hacemos la vaquita.
-Corre como página estática (HTML/CSS/JS) + Firebase Firestore como base de datos
-compartida en tiempo real. Login anónimo automático (nadie ve una pantalla de
-login, pero por atrás cada visita queda identificada para la base de datos).
+App para repartir gastos entre amigos. Nació para la despedida de soltero de
+Cristian y quedó para todas las salidas que vengan.
 
-## 1. Crear el proyecto en Firebase (gratis)
+El nombre mezcla *moola* (plata, en inglés) con el *muuu* de la vaca: hacemos la vaquita.
 
-1. Andá a https://console.firebase.google.com y creá un proyecto nuevo
-   (por ejemplo `despedida-kiki`). No hace falta tarjeta de crédito para esto.
-2. En el menú de la izquierda, andá a **Compilación > Firestore Database** y
-   creá una base de datos. Elegí el modo que sea (después vamos a pisar las
-   reglas con las de este proyecto). Elegí una región cercana (ej: `southamerica-east1`).
-3. Andá a **Compilación > Authentication**, pestaña **Sign-in method**, y
-   activá el proveedor **Anónimo**.
-4. Andá a **Configuración del proyecto** (el engranaje) > pestaña **General**
-   > sección **Tus apps** > ícono `</>` (Web) > registrá una app (el nombre
-   no importa, no hace falta Firebase Hosting).
-5. Te va a mostrar un objeto `firebaseConfig` con `apiKey`, `authDomain`,
-   `projectId`, etc. **Copiá esos valores** y pegalos en el archivo
-   `firebase-config.js` de esta carpeta, reemplazando los placeholders.
+**Link:** https://mmg15.github.io/Mooohla/ (con **M** mayúscula; en minúscula da 404).
 
-## 2. Cargar las reglas de seguridad
+## Qué hace
 
-1. En Firebase Console, andá a **Firestore Database > Reglas**.
-2. Reemplazá el contenido por el de `firestore.rules` (está en esta carpeta).
-3. Publicá los cambios.
+- **Gastos:** cada uno anota lo que pagó, en qué categoría (combustible, comida,
+  bebidas, salidas, otros) y entre quiénes se reparte.
+- **Resumen:** total gastado, gasto por categoría, cuánto puso y cuánto le toca
+  a cada uno, y **quién le paga a quién** con la menor cantidad de transferencias.
+- **Participantes:** se agregan o quitan personas y se cambia la moneda.
+- **En tiempo real:** lo que carga uno lo ven todos al instante.
+- **Se instala como app** en el celular (PWA) y **funciona sin señal**.
 
-Estas reglas dejan que cualquiera que abra el link (con su sesión anónima
-automática) lea y escriba los gastos y la config del evento. No es un login
-"de verdad", pero alcanza para un grupo cerrado de amigos con el link.
+## Cómo se usa
 
-## 3. Probar en tu compu antes de subir
+1. Abrí el link y elegí tu nombre en **"Vos sos:"**.
+2. Instalala para tenerla a mano:
+   - **Android / compu (Chrome o Edge):** botón naranja **Instalar** arriba a la derecha.
+   - **iPhone (Safari):** **Compartir** → **Agregar a inicio**.
+3. Cargá los gastos en la pestaña **Gastos** y mirá las cuentas en **Resumen**.
 
-Abrí `index.html` con algo como la extensión "Live Server" de VS Code, o corré
-en esta carpeta:
+El indicador de arriba a la derecha muestra el estado:
 
-```
-npx serve .
-```
+| Indicador | Qué significa |
+|---|---|
+| 🟢 **Sincronizado** | Todo guardado en la nube. |
+| 🟠 **Guardando…** | Subiendo un cambio. |
+| 🟡 **Sin conexión** | No hay señal; ves los últimos datos guardados en el celular. |
+| 🟡 **Sin conexión · pendiente** | Cargaste algo sin señal; se sube solo cuando vuelve internet. |
+| 🟡 **Modo local** | No se pudo conectar a Firebase; lo que cargues queda solo en ese dispositivo. |
 
-y entrá a la URL que te muestre. Fijate que arriba a la izquierda diga
-**"Sincronizado"** (verde) y no "Modo local" (amarillo) — si dice "Modo
-local", revisá que `firebase-config.js` tenga los valores reales y que
-hayas activado el login Anónimo en el paso 1.
+## Cómo está hecha
 
-## 4. Deployar a Vercel
+- **Página estática:** HTML, CSS y JavaScript en un solo `index.html`, sin
+  frameworks ni build.
+- **Base de datos:** [Firebase Firestore](https://firebase.google.com/docs/firestore),
+  compartida y en tiempo real, con caché persistente para funcionar offline.
+- **Login anónimo automático:** nadie ve pantalla de login, pero cada visita
+  queda identificada para que las reglas de Firestore la dejen leer y escribir.
+- **PWA:** manifest + service worker, así se instala y abre sin internet.
+- **Hosting:** GitHub Pages. Cada `git push` a `main` publica la versión nueva
+  en 1 o 2 minutos.
 
-Con la cuenta de Vercel ya creada:
+### Archivos
 
-**Opción A — sin Git, arrastrando la carpeta:**
-1. Entrá a https://vercel.com/new
-2. Elegí la opción de subir una carpeta directamente (drag & drop) y
-   soltá esta carpeta completa (`index.html`, `firebase-config.js`, etc.).
-3. Vercel te da un link tipo `despedida-kiki.vercel.app` — ese es el
-   definitivo para mandarle al grupo.
+| Archivo | Para qué sirve |
+|---|---|
+| `index.html` | La app completa (pantallas, cálculos y conexión a Firebase). |
+| `firebase-config.js` | Datos de conexión al proyecto de Firebase. |
+| `firestore.rules` | Reglas de seguridad de la base (se cargan a mano en Firebase Console). |
+| `manifest.webmanifest` | Nombre, colores e íconos de la app instalada. |
+| `sw.js` | Service worker: guarda una copia de la app para abrirla sin señal. |
+| `icons/` | `logo.svg` (vaquita del encabezado), `icon.svg` (ícono de la app) y los PNG generados a partir de él. |
+| `og-image.jpg` | Imagen de la vista previa al compartir el link por WhatsApp y otras apps. |
 
-**Opción B — con la CLI de Vercel:**
-```
-npm i -g vercel
-cd despedida-kiki
-vercel login
-vercel --prod
-```
+## Hacer cambios
 
-## 5. Mandale el link al grupo
+1. Editá los archivos en esta carpeta.
+2. Probá en tu compu. Tiene que ser con un servidor, no con doble clic en
+   `index.html`, porque así Firebase y el modo offline no funcionan:
+   ```
+   python -m http.server 8000
+   ```
+   y entrá a http://localhost:8000
+3. Si el cambio es grande, subí el número de `VERSION` en `sw.js`
+   (por ejemplo `mooohla-v3` → `mooohla-v4`). Así los celulares bajan la
+   versión nueva y la app se recarga sola una vez.
+4. `git commit` + `git push`. En 1 o 2 minutos está publicado.
 
-Una vez deployado, el link de Vercel ya sirve para que **todos** —logueados
-o no en ningún lado— puedan cargar y ver los gastos en tiempo real. No
-necesitan cuenta de Claude ni nada especial, solo abrir el link.
+## Firebase (por si hay que armarlo de cero)
 
-## 6. Instalarla como app (PWA)
+1. En https://console.firebase.google.com creá un proyecto (gratis, sin tarjeta).
+2. **Compilación → Firestore Database:** creá la base (región cercana, ej. `southamerica-east1`).
+3. **Compilación → Authentication → Sign-in method:** activá **Anónimo**.
+4. **Configuración del proyecto → Tus apps → `</>` (Web):** registrá una app
+   y copiá el `firebaseConfig` en `firebase-config.js`.
+5. **Firestore Database → Reglas:** pegá el contenido de `firestore.rules` y publicá.
 
-La app es una PWA: se puede instalar en el celular y funciona sin internet.
-
-- **Android (Chrome):** aparece un botón **Instalar** arriba a la derecha
-  (o desde el menú ⋮ > "Instalar app").
-- **iPhone (Safari):** tocá **Compartir** > **Agregar a inicio**. La app
-  muestra un cartelito con esta instrucción la primera vez.
-
-Sin señal, la app abre igual, muestra los últimos gastos que vio y deja
-cargar gastos nuevos. Arriba a la derecha dice **"Sin conexión · pendiente"**
-y, cuando vuelve internet, los sube solos.
-
-Archivos de la PWA:
-- `manifest.webmanifest`: nombre, colores e íconos de la app instalada.
-- `sw.js`: service worker que guarda una copia de la app para abrirla offline.
-  Si hacés un cambio grande y no aparece en los celulares, subí el número de
-  `VERSION` en este archivo.
-- `icons/`: `logo.svg` es la vaquita del encabezado; `icon.svg` es el ícono de
-  la app (vaquita sobre fondo naranja) y los PNG se generan a partir de él.
-
-Los gastos offline los maneja la caché persistente de Firestore, no el service worker.
+Las reglas dejan leer y escribir a cualquiera que abra el link. No es un login
+de verdad, pero alcanza para un grupo de amigos.
 
 ## Notas
 
-- Si en algún momento las reglas del paso 2 no están cargadas, la app se
-  cae sola a "Modo local" (guarda solo en el celular de esa persona) para
-  no romperse — pero no vas a tener sincronización real hasta que las
-  cargues.
-- Los datos quedan en tu proyecto de Firebase — plan gratis (Spark) alcanza
-  de sobra para esto (unas decenas de gastos, 8 personas).
-- Si querés borrar todo y arrancar de cero, es más fácil hacerlo desde
-  Firebase Console > Firestore Database > borrando los documentos de las
-  colecciones `config` y `expenses`.
+- El plan gratis de Firebase (Spark) alcanza de sobra para esto.
+- Para arrancar una salida nueva desde cero, borrá los documentos de las
+  colecciones `expenses` (gastos) y, si querés, `config` desde
+  Firebase Console → Firestore Database. **Ojo: no se puede deshacer.**
+- El proyecto de Firebase se sigue llamando `despedida-de-soltero-kiki`.
+  Es un nombre interno, nadie lo ve.
