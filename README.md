@@ -70,6 +70,28 @@ Una vez deployado, el link de Vercel ya sirve para que **todos** —logueados
 o no en ningún lado— puedan cargar y ver los gastos en tiempo real. No
 necesitan cuenta de Claude ni nada especial, solo abrir el link.
 
+## 6. Instalarla como app (PWA)
+
+La app es una PWA: se puede instalar en el celular y funciona sin internet.
+
+- **Android (Chrome):** aparece un botón **Instalar** arriba a la derecha
+  (o desde el menú ⋮ > "Instalar app").
+- **iPhone (Safari):** tocá **Compartir** > **Agregar a inicio**. La app
+  muestra un cartelito con esta instrucción la primera vez.
+
+Sin señal, la app abre igual, muestra los últimos gastos que vio y deja
+cargar gastos nuevos. Arriba a la derecha dice **"Sin conexión · pendiente"**
+y, cuando vuelve internet, los sube solos.
+
+Archivos de la PWA:
+- `manifest.webmanifest`: nombre, colores e íconos de la app instalada.
+- `sw.js`: service worker que guarda una copia de la app para abrirla offline.
+  Si hacés un cambio grande y no aparece en los celulares, subí el número de
+  `VERSION` en este archivo.
+- `icons/`: íconos (el `icon.svg` es el original; los PNG salen de ahí).
+
+Los gastos offline los maneja la caché persistente de Firestore, no el service worker.
+
 ## Notas
 
 - Si en algún momento las reglas del paso 2 no están cargadas, la app se

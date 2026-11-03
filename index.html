@@ -2,8 +2,17 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Despedida Kiki</title>
+<!-- PWA: datos para instalar la app en el celular -->
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#c85a1e">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Kiki">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800;900&family=Karla:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
 <style>
@@ -61,6 +70,10 @@
   .num{ font-family:'JetBrains Mono', ui-monospace, monospace; font-variant-numeric:tabular-nums; }
 
   .wrap{ max-width:720px; margin:0 auto; padding:20px 16px 64px; }
+  /* Instalada como app: dejar lugar para el notch y la barra de gestos */
+  @media (display-mode: standalone){
+    .wrap{ padding-top:calc(20px + env(safe-area-inset-top)); padding-bottom:calc(64px + env(safe-area-inset-bottom)); }
+  }
 
   .topbar{ display:flex; align-items:center; gap:12px; padding-bottom:16px; border-bottom:2px solid var(--line); margin-bottom:18px; }
   .brand{ display:flex; align-items:center; gap:10px; flex:1; min-width:0; }
@@ -70,7 +83,14 @@
   .brand-text .event{ font-size:12.5px; color:var(--ink-soft); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:2px; }
   .sync{ font-size:11px; color:var(--ink-soft); display:flex; align-items:center; gap:5px; white-space:nowrap; }
   .sync .dot{ width:7px; height:7px; border-radius:50%; background:var(--moss); }
-  .sync.local .dot{ background:var(--brass); }
+  .sync.local .dot, .sync.offline .dot{ background:var(--brass); }
+  .sync.pending .dot{ background:var(--ember); }
+
+  .install-btn{ font:inherit; font-size:11.5px; font-weight:700; background:var(--ember); color:var(--ember-ink); border:none; border-radius:999px; padding:6px 11px; cursor:pointer; white-space:nowrap; }
+  .install-hint{ display:flex; align-items:center; gap:10px; background:var(--paper-raised); border:1.5px dashed var(--ember); color:var(--ink-soft); border-radius:12px; padding:10px 12px; font-size:12.5px; margin-bottom:16px; }
+  .install-hint span{ flex:1; }
+  .install-hint button{ border:none; background:transparent; color:var(--ink-soft); font-size:16px; cursor:pointer; padding:2px 4px; }
+  [hidden]{ display:none !important; }
 
   .whoami{ display:flex; align-items:center; gap:8px; margin-bottom:16px; font-size:13px; color:var(--ink-soft); }
   .whoami select{ font:inherit; font-weight:700; color:var(--ink); background:var(--paper-raised); border:1.5px solid var(--line); border-radius:8px; padding:6px 10px; }
@@ -186,7 +206,13 @@
         <div class="event" id="eventNameLabel">&nbsp;</div>
       </div>
     </div>
+    <button type="button" class="install-btn" id="installBtn" hidden>Instalar</button>
     <div class="sync" id="syncIndicator"><span class="dot"></span><span id="syncLabel">Cargando…</span></div>
+  </div>
+
+  <div class="install-hint" id="iosHint" hidden>
+    <span>Para instalarla en el iPhone: tocá <b>Compartir</b> y después <b>Agregar a inicio</b>.</span>
+    <button type="button" id="iosHintClose" aria-label="Cerrar">×</button>
   </div>
 
   <div class="whoami">
@@ -208,7 +234,8 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
 import {
-  getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc,
+  getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
+  doc, getDoc, setDoc, updateDoc, deleteDoc,
   collection, onSnapshot, query, orderBy
 } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
 import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js";
@@ -258,6 +285,8 @@ import { firebaseConfig } from "./firebase-config.js";
   var pendingRemoteRender = false;
   var gastosNotice = null;
   var participantesNotice = null;
+  var isOnline = navigator.onLine;
+  var pendingWrites = { config:false, expenses:false };
 
   function clone(o){ return JSON.parse(JSON.stringify(o)); }
 
@@ -300,10 +329,13 @@ import { firebaseConfig } from "./firebase-config.js";
     return 'No se pudo guardar. Probá de nuevo.';
   }
 
-  async function saveConfig(newConfig){
+  // En modo compartido NO esperamos (await) a que el servidor confirme:
+  // Firestore aplica el cambio al toque en la caché local y lo manda cuando hay señal.
+  // Si esperáramos, sin internet la pantalla quedaría trabada.
+  function saveConfig(newConfig){
     if(mode === 'shared'){
-      try{ await setDoc(doc(fsDb,'config','main'), newConfig); }
-      catch(e){ console.error('save config failed', e); participantesNotice = errorMessage(e); render(); return; }
+      setDoc(doc(fsDb,'config','main'), newConfig)
+        .catch(function(e){ console.error('save config failed', e); participantesNotice = errorMessage(e); render(); });
     } else {
       config = newConfig;
       persistLocal();
@@ -315,22 +347,23 @@ import { firebaseConfig } from "./firebase-config.js";
     render();
   }
 
-  async function addOrUpdateExpense(exp){
+  function addOrUpdateExpense(exp){
     var wasEditing = editingId;
     if(mode === 'shared'){
+      var write;
       try{
         if(wasEditing){
-          await updateDoc(doc(fsDb,'expenses',wasEditing), exp);
+          write = updateDoc(doc(fsDb,'expenses',wasEditing), exp);
         } else {
           exp.createdAt = Date.now();
-          var ref = doc(collection(fsDb,'expenses'));
-          await setDoc(ref, exp);
+          write = setDoc(doc(collection(fsDb,'expenses')), exp);
         }
       }catch(e){
         console.error('save expense failed', e);
         showFormError(errorMessage(e));
         return;
       }
+      write.catch(function(e){ console.error('save expense failed', e); gastosNotice = errorMessage(e); render(); });
     } else {
       if(wasEditing){
         var found = expenses.find(function(x){ return x.id === wasEditing; });
@@ -350,10 +383,11 @@ import { firebaseConfig } from "./firebase-config.js";
     if(err) err.textContent = msg;
   }
 
-  async function deleteExpense(id){
+  function deleteExpense(id){
     if(mode === 'shared'){
-      try{ await deleteDoc(doc(fsDb,'expenses', id)); gastosNotice = null; }
-      catch(e){ console.error('delete failed', e); gastosNotice = errorMessage(e); }
+      gastosNotice = null;
+      deleteDoc(doc(fsDb,'expenses', id))
+        .catch(function(e){ console.error('delete failed', e); gastosNotice = errorMessage(e); render(); });
       render();
     } else {
       expenses = expenses.filter(function(e){ return e.id !== id; });
@@ -365,23 +399,39 @@ import { firebaseConfig } from "./firebase-config.js";
   async function initStorage(){
     try{
       var app = initializeApp(firebaseConfig);
-      fsDb = getFirestore(app);
+      // Caché persistente: guarda una copia de los gastos en el celular (IndexedDB).
+      // Así la app muestra los datos y deja cargar gastos aunque no haya internet.
+      try{
+        fsDb = initializeFirestore(app, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) });
+      }catch(e){
+        console.warn('Sin caché offline, uso Firestore normal', e);
+        fsDb = getFirestore(app);
+      }
       var authFs = getAuth(app);
+      // El login anónimo queda guardado en el dispositivo, así que offline
+      // se recupera el mismo usuario sin pedirle nada al servidor.
       await new Promise(function(resolve, reject){
         var unsub = onAuthStateChanged(authFs, function(user){
           if(user){ unsub(); resolve(user); }
         }, reject);
-        signInAnonymously(authFs).catch(reject);
+        signInAnonymously(authFs).catch(function(e){ if(!authFs.currentUser) reject(e); });
       });
       mode = 'shared';
-      await ensureSeeded();
-      onSnapshot(doc(fsDb,'config','main'), function(snap){
-        config = snap.exists() ? snap.data() : clone(DEFAULT_CONFIG);
+      // Si no hay señal y nunca se bajó la config, no frenamos la app por eso.
+      try{ await ensureSeeded(); }catch(e){ console.warn('ensureSeeded skipped (offline?)', e); }
+      onSnapshot(doc(fsDb,'config','main'), { includeMetadataChanges:true }, function(snap){
+        pendingWrites.config = snap.metadata.hasPendingWrites;
+        var next = snap.exists() ? snap.data() : clone(DEFAULT_CONFIG);
+        // Si solo cambió el estado de sincronización, actualizamos el indicador y listo.
+        if(config && JSON.stringify(next) === JSON.stringify(config)){ renderSync(); return; }
+        config = next;
         syncDraft();
         pendingRemoteRender = true;
         render();
       }, function(err){ console.error('config snapshot error', err); fallbackToLocal(); });
-      onSnapshot(query(collection(fsDb,'expenses'), orderBy('createdAt','desc')), function(qs){
+      onSnapshot(query(collection(fsDb,'expenses'), orderBy('createdAt','desc')), { includeMetadataChanges:true }, function(qs){
+        pendingWrites.expenses = qs.metadata.hasPendingWrites;
+        if(qs.docChanges().length === 0 && expenses.length === qs.size){ renderSync(); return; }
         expenses = qs.docs.map(function(d){ return Object.assign({ id: d.id }, d.data()); });
         pendingRemoteRender = true;
         render();
@@ -510,10 +560,7 @@ import { firebaseConfig } from "./firebase-config.js";
     var preservedGastos = (isRemote && activeTab === 'gastos') ? captureGastosFormState() : null;
     var preservedNewPerson = (isRemote && activeTab === 'participantes') ? captureParticipantesFormState() : null;
     document.getElementById('eventNameLabel').textContent = config.eventName || 'Despedida';
-    var syncEl = document.getElementById('syncIndicator');
-    var syncLabel = document.getElementById('syncLabel');
-    if(mode === 'shared'){ syncEl.classList.remove('local'); syncLabel.textContent = 'Sincronizado'; }
-    else { syncEl.classList.add('local'); syncLabel.textContent = 'Modo local'; }
+    renderSync();
 
     document.querySelectorAll('.tab-btn').forEach(function(btn){
       btn.classList.toggle('active', btn.getAttribute('data-tab') === activeTab);
@@ -530,6 +577,20 @@ import { firebaseConfig } from "./firebase-config.js";
     if(activeTab === 'resumen') bindResumenEvents();
     if(activeTab === 'gastos'){ bindGastosEvents(); restoreGastosFormState(preservedGastos); }
     if(activeTab === 'participantes'){ bindParticipantesEvents(); restoreParticipantesFormState(preservedNewPerson); }
+  }
+
+  // Indicador de arriba a la derecha: Sincronizado / Sin conexión / Guardando… / Modo local
+  function renderSync(){
+    var syncEl = document.getElementById('syncIndicator');
+    var syncLabel = document.getElementById('syncLabel');
+    var state, label;
+    if(mode !== 'shared'){ state = 'local'; label = 'Modo local'; }
+    else if(!isOnline){ state = 'offline'; label = (pendingWrites.config || pendingWrites.expenses) ? 'Sin conexión · pendiente' : 'Sin conexión'; }
+    else if(pendingWrites.config || pendingWrites.expenses){ state = 'pending'; label = 'Guardando…'; }
+    else { state = 'ok'; label = 'Sincronizado'; }
+    syncEl.classList.remove('local','offline','pending');
+    if(state !== 'ok') syncEl.classList.add(state);
+    syncLabel.textContent = label;
   }
 
   function renderWhoami(){
@@ -783,7 +844,49 @@ import { firebaseConfig } from "./firebase-config.js";
     };
   }
 
+  window.addEventListener('online', function(){ isOnline = true; if(config) renderSync(); });
+  window.addEventListener('offline', function(){ isOnline = false; if(config) renderSync(); });
+
   initStorage();
+})();
+
+// ---------------- PWA: instalación y modo offline ----------------
+(function(){
+  // Registra el service worker (el que guarda la app para abrirla sin internet).
+  if('serviceWorker' in navigator){
+    window.addEventListener('load', function(){
+      navigator.serviceWorker.register('sw.js').catch(function(e){ console.warn('SW no registrado', e); });
+    });
+  }
+
+  var isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+
+  // Android / Chrome / Edge: el navegador avisa que se puede instalar y mostramos el botón.
+  var installBtn = document.getElementById('installBtn');
+  var deferredPrompt = null;
+  window.addEventListener('beforeinstallprompt', function(e){
+    e.preventDefault();
+    deferredPrompt = e;
+    installBtn.hidden = false;
+  });
+  installBtn.onclick = function(){
+    if(!deferredPrompt) return;
+    deferredPrompt.prompt();
+    deferredPrompt.userChoice.finally(function(){ deferredPrompt = null; installBtn.hidden = true; });
+  };
+  window.addEventListener('appinstalled', function(){ installBtn.hidden = true; });
+
+  // iPhone: Safari no tiene botón de instalar, así que explicamos cómo hacerlo a mano.
+  var HINT_KEY = 'kiki_ios_hint_closed';
+  var isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  var hintClosed = false;
+  try{ hintClosed = localStorage.getItem(HINT_KEY) === '1'; }catch(e){}
+  var hint = document.getElementById('iosHint');
+  if(isIOS && !isStandalone && !hintClosed) hint.hidden = false;
+  document.getElementById('iosHintClose').onclick = function(){
+    hint.hidden = true;
+    try{ localStorage.setItem(HINT_KEY, '1'); }catch(e){}
+  };
 })();
 </script>
 </body>
