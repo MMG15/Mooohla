@@ -839,8 +839,17 @@ import { firebaseConfig } from "./firebase-config.js";
 (function(){
   // Registra el service worker (el que guarda la app para abrirla sin internet).
   if('serviceWorker' in navigator){
+    // Si ya había una versión instalada y llega una nueva, recargamos una vez para mostrarla.
+    var hadController = !!navigator.serviceWorker.controller;
+    var reloaded = false;
+    navigator.serviceWorker.addEventListener('controllerchange', function(){
+      if(!hadController || reloaded) return;
+      reloaded = true;
+      window.location.reload();
+    });
     window.addEventListener('load', function(){
-      navigator.serviceWorker.register('sw.js').catch(function(e){ console.warn('SW no registrado', e); });
+      navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })
+        .catch(function(e){ console.warn('SW no registrado', e); });
     });
   }
 

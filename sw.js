@@ -2,7 +2,7 @@
 // Los datos (gastos) NO pasan por acá: de eso se encarga la caché offline de Firestore.
 
 // Cambiá este número cuando quieras forzar que todos bajen la versión nueva.
-const VERSION = 'mooohla-v2';
+const VERSION = 'mooohla-v3';
 const APP_CACHE = VERSION + '-app';
 const CDN_CACHE = VERSION + '-cdn';
 
@@ -67,7 +67,9 @@ self.addEventListener('fetch', (event) => {
 async function networkFirst(req) {
   const cache = await caches.open(APP_CACHE);
   try {
-    const res = await fetch(req);
+    // 'no-cache' = preguntarle siempre al servidor si hay versión nueva,
+    // en vez de usar la copia que el navegador guarda hasta 10 minutos.
+    const res = await fetch(req, { cache: 'no-cache' });
     if (res.ok) cache.put(req, res.clone());
     return res;
   } catch (err) {
