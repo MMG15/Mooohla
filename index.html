@@ -189,7 +189,7 @@
       <img class="cow" src="icons/logo.svg" width="48" height="48" alt="">
       <div class="brand-text">
         <h1>Mooohla</h1>
-        <div class="event" id="eventNameLabel">&nbsp;</div>
+        <div class="event">Cuentas claras conservan amistades</div>
       </div>
     </div>
     <button type="button" class="install-btn" id="installBtn" hidden>Instalar</button>
@@ -545,7 +545,6 @@ import { firebaseConfig } from "./firebase-config.js";
     pendingRemoteRender = false;
     var preservedGastos = (isRemote && activeTab === 'gastos') ? captureGastosFormState() : null;
     var preservedNewPerson = (isRemote && activeTab === 'participantes') ? captureParticipantesFormState() : null;
-    document.getElementById('eventNameLabel').textContent = config.eventName || 'Mooohla';
     renderSync();
 
     document.querySelectorAll('.tab-btn').forEach(function(btn){
