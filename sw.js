@@ -2,7 +2,7 @@
 // Los datos (gastos) NO pasan por acá: de eso se encarga la caché offline de Firestore.
 
 // Cambiá este número cuando quieras forzar que todos bajen la versión nueva.
-const VERSION = 'kiki-v1';
+const VERSION = 'mooohla-v2';
 const APP_CACHE = VERSION + '-app';
 const CDN_CACHE = VERSION + '-cdn';
 
@@ -15,7 +15,8 @@ const APP_FILES = [
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/apple-touch-icon.png',
-  './icons/icon.svg'
+  './icons/icon.svg',
+  './icons/logo.svg'
 ];
 
 // Librerías de Firebase: las bajamos de entrada para que la primera vez offline ya ande.

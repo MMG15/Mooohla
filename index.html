@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>Despedida Kiki</title>
+<title>Mooohla</title>
 <!-- PWA: datos para instalar la app en el celular -->
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#c85a1e">
@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="Kiki">
+<meta name="apple-mobile-web-app-title" content="Mooohla">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800;900&family=Karla:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
 <style>
@@ -186,23 +186,9 @@
 <div class="wrap">
   <div class="topbar">
     <div class="brand">
-      <svg class="cow" width="46" height="46" viewBox="0 0 60 58" fill="none" aria-hidden="true">
-        <ellipse cx="9" cy="35" rx="4.5" ry="6" transform="rotate(-25 9 35)" fill="var(--brass)" stroke="var(--ink)" stroke-width="1.2"/>
-        <ellipse cx="51" cy="35" rx="4.5" ry="6" transform="rotate(25 51 35)" fill="var(--brass)" stroke="var(--ink)" stroke-width="1.2"/>
-        <ellipse cx="30" cy="37" rx="17" ry="15" fill="var(--paper-raised)" stroke="var(--ink)" stroke-width="1.8"/>
-        <ellipse cx="43" cy="41" rx="5" ry="3.6" fill="var(--ink)" opacity="0.14"/>
-        <ellipse cx="30" cy="25" rx="23" ry="6" fill="var(--brass)" stroke="var(--ink)" stroke-width="1.6"/>
-        <path d="M10,25 C10,10 50,10 50,25 Z" fill="var(--brass)" stroke="var(--ink)" stroke-width="1.6"/>
-        <rect x="24.5" y="16" width="11" height="5" rx="1.2" fill="var(--ink)" opacity="0.85"/>
-        <rect x="14" y="34" width="13" height="8.5" rx="3.2" fill="var(--ink)"/>
-        <rect x="33" y="34" width="13" height="8.5" rx="3.2" fill="var(--ink)"/>
-        <rect x="27" y="36.3" width="6" height="2.6" fill="var(--ink)"/>
-        <ellipse cx="25.5" cy="48.5" rx="1.4" ry="1.1" fill="var(--ink)"/>
-        <ellipse cx="34.5" cy="48.5" rx="1.4" ry="1.1" fill="var(--ink)"/>
-        <ellipse cx="30" cy="51.5" rx="5.5" ry="3.8" fill="var(--rust)"/>
-      </svg>
+      <img class="cow" src="icons/logo.svg" width="48" height="48" alt="">
       <div class="brand-text">
-        <h1>Despedida Kiki</h1>
+        <h1>Mooohla</h1>
         <div class="event" id="eventNameLabel">&nbsp;</div>
       </div>
     </div>
@@ -228,7 +214,7 @@
 
   <div id="app"></div>
 
-  <footer class="credit">Hecha para no discutir de plata en la despedida.</footer>
+  <footer class="credit">Hecha para no discutir de plata entre amigos.</footer>
 </div>
 
 <script type="module">
@@ -263,7 +249,7 @@ import { firebaseConfig } from "./firebase-config.js";
   }
 
   var DEFAULT_PARTICIPANTS = ["Mathias","Eduardo","Nahir","Marcos","Lucas","Emiliano","Cristian","Pepa"];
-  var DEFAULT_CONFIG = { eventName:"Despedida de Cristian", currency:"$", participants: DEFAULT_PARTICIPANTS.slice() };
+  var DEFAULT_CONFIG = { eventName:"Nueva salida", currency:"$", participants: DEFAULT_PARTICIPANTS.slice() };
   var DEFAULT_EXPENSES = [];
   function iso(daysAgo){ var d=new Date(Date.now()-daysAgo*86400000); return d.toISOString().slice(0,10); }
 
@@ -559,7 +545,7 @@ import { firebaseConfig } from "./firebase-config.js";
     pendingRemoteRender = false;
     var preservedGastos = (isRemote && activeTab === 'gastos') ? captureGastosFormState() : null;
     var preservedNewPerson = (isRemote && activeTab === 'participantes') ? captureParticipantesFormState() : null;
-    document.getElementById('eventNameLabel').textContent = config.eventName || 'Despedida';
+    document.getElementById('eventNameLabel').textContent = config.eventName || 'Mooohla';
     renderSync();
 
     document.querySelectorAll('.tab-btn').forEach(function(btn){

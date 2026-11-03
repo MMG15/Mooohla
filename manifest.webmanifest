@@ -1,7 +1,7 @@
 {
-  "name": "Despedida Kiki",
-  "short_name": "Kiki",
-  "description": "Reparto de gastos de la despedida de Cristian.",
+  "name": "Mooohla",
+  "short_name": "Mooohla",
+  "description": "Reparto de gastos entre amigos: hacemos la vaquita.",
   "lang": "es-AR",
   "start_url": "./",
   "scope": "./",

@@ -1,6 +1,7 @@
-# Despedida Kiki — app propia
+# Mooohla 🐄
 
-App de reparto de gastos para la despedida, sin depender de cuentas de Claude.
+App para repartir gastos entre amigos (nació para la despedida de Cristian).
+El nombre mezcla *moola* (plata, en inglés) con el *mooo* de la vaca: hacemos la vaquita.
 Corre como página estática (HTML/CSS/JS) + Firebase Firestore como base de datos
 compartida en tiempo real. Login anónimo automático (nadie ve una pantalla de
 login, pero por atrás cada visita queda identificada para la base de datos).
@@ -88,7 +89,8 @@ Archivos de la PWA:
 - `sw.js`: service worker que guarda una copia de la app para abrirla offline.
   Si hacés un cambio grande y no aparece en los celulares, subí el número de
   `VERSION` en este archivo.
-- `icons/`: íconos (el `icon.svg` es el original; los PNG salen de ahí).
+- `icons/`: `logo.svg` es la vaquita del encabezado; `icon.svg` es el ícono de
+  la app (vaquita sobre fondo naranja) y los PNG se generan a partir de él.
 
 Los gastos offline los maneja la caché persistente de Firestore, no el service worker.
 
