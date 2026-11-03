@@ -2,7 +2,7 @@
 // Los datos (gastos) NO pasan por acá: de eso se encarga la caché offline de Firestore.
 
 // Cambiá este número cuando quieras forzar que todos bajen la versión nueva.
-const VERSION = 'mooohla-v3';
+const VERSION = 'mooohla-v4';
 const APP_CACHE = VERSION + '-app';
 const CDN_CACHE = VERSION + '-cdn';
 

@@ -191,6 +191,12 @@
   .add-person input{ flex:1; }
   .field-row{ display:grid; grid-template-columns:2fr 1fr; gap:10px; }
   .dirty-note{ font-size:12px; color:var(--brass); font-weight:700; }
+  .join-card{ border-color:var(--ember); }
+  .join-text{ margin:0 0 12px; font-size:13.5px; color:var(--ink-soft); line-height:1.45; }
+  .readonly-banner{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .readonly-banner span{ flex:1; min-width:180px; }
+  input:disabled{ opacity:0.75; }
+  button:disabled{ opacity:0.6; cursor:default; }
   footer.credit{ text-align:center; font-size:11.5px; color:var(--ink-soft); margin-top:26px; }
 </style>
 </head>
@@ -286,6 +292,12 @@ import { firebaseConfig } from "./firebase-config.js";
   var participantesNotice = null;
   var isOnline = navigator.onLine;
   var pendingWrites = { config:false, expenses:false };
+  // Permisos: todos ven, pero solo los dispositivos que ingresaron el código del grupo pueden editar.
+  var MEMBER_KEY = 'kiki_member';
+  var myUid = null;
+  var canEdit = false;
+  var joining = false;
+  var joinNotice = null;
 
   function clone(o){ return JSON.parse(JSON.stringify(o)); }
 
@@ -332,6 +344,7 @@ import { firebaseConfig } from "./firebase-config.js";
   // Firestore aplica el cambio al toque en la caché local y lo manda cuando hay señal.
   // Si esperáramos, sin internet la pantalla quedaría trabada.
   function saveConfig(newConfig){
+    if(!canEdit) return;
     if(mode === 'shared'){
       setDoc(doc(fsDb,'config','main'), newConfig)
         .catch(function(e){ console.error('save config failed', e); participantesNotice = errorMessage(e); render(); });
@@ -347,6 +360,7 @@ import { firebaseConfig } from "./firebase-config.js";
   }
 
   function addOrUpdateExpense(exp){
+    if(!canEdit) return;
     var wasEditing = editingId;
     if(mode === 'shared'){
       var write;
@@ -383,6 +397,7 @@ import { firebaseConfig } from "./firebase-config.js";
   }
 
   function deleteExpense(id){
+    if(!canEdit) return;
     if(mode === 'shared'){
       gastosNotice = null;
       deleteDoc(doc(fsDb,'expenses', id))
@@ -409,13 +424,15 @@ import { firebaseConfig } from "./firebase-config.js";
       var authFs = getAuth(app);
       // El login anónimo queda guardado en el dispositivo, así que offline
       // se recupera el mismo usuario sin pedirle nada al servidor.
-      await new Promise(function(resolve, reject){
+      var user = await new Promise(function(resolve, reject){
         var unsub = onAuthStateChanged(authFs, function(user){
           if(user){ unsub(); resolve(user); }
         }, reject);
         signInAnonymously(authFs).catch(function(e){ if(!authFs.currentUser) reject(e); });
       });
+      myUid = user.uid;
       mode = 'shared';
+      canEdit = await checkMembership(myUid);
       // Si no hay señal y nunca se bajó la config, no frenamos la app por eso.
       try{ await ensureSeeded(); }catch(e){ console.warn('ensureSeeded skipped (offline?)', e); }
       onSnapshot(doc(fsDb,'config','main'), { includeMetadataChanges:true }, function(snap){
@@ -441,8 +458,46 @@ import { firebaseConfig } from "./firebase-config.js";
     }
   }
 
+  // ---------------- permisos (código del grupo) ----------------
+
+  // ¿Este dispositivo ya ingresó el código? Se fija si existe members/{uid}.
+  // Sin señal, usa lo último que se supo (guardado en el celular).
+  async function checkMembership(uid){
+    try{
+      var snap = await getDoc(doc(fsDb,'members',uid));
+      var ok = snap.exists();
+      try{ localStorage.setItem(MEMBER_KEY, ok ? '1' : '0'); }catch(e){}
+      return ok;
+    }catch(e){
+      try{ return localStorage.getItem(MEMBER_KEY) === '1'; }catch(e2){ return false; }
+    }
+  }
+
+  // Crea members/{uid} con el código. Las reglas de Firestore lo aceptan
+  // solo si el código coincide con el guardado en /private/joinCode.
+  async function joinGroup(code){
+    code = (code || '').trim();
+    if(!code){ joinNotice = 'Escribí el código del grupo.'; render(); return; }
+    if(!navigator.onLine){ joinNotice = 'Necesitás internet para validar el código.'; render(); return; }
+    joining = true; joinNotice = null; render();
+    try{
+      await Promise.race([
+        setDoc(doc(fsDb,'members',myUid), { code: code, joinedAt: Date.now() }),
+        new Promise(function(_, reject){ setTimeout(function(){ reject({ code:'timeout' }); }, 12000); })
+      ]);
+      canEdit = true;
+      try{ localStorage.setItem(MEMBER_KEY, '1'); }catch(e){}
+    }catch(e){
+      console.warn('join failed', e);
+      joinNotice = (e && e.code === 'permission-denied') ? 'Código incorrecto.' : 'No se pudo validar. Probá de nuevo.';
+    }
+    joining = false;
+    render();
+  }
+
   function fallbackToLocal(){
     mode = 'local';
+    canEdit = true; // en modo local los datos son solo de este dispositivo
     loadLocal();
     syncDraft();
     render();
@@ -558,6 +613,8 @@ import { firebaseConfig } from "./firebase-config.js";
     pendingRemoteRender = false;
     var preservedGastos = (isRemote && activeTab === 'gastos') ? captureGastosFormState() : null;
     var preservedNewPerson = (isRemote && activeTab === 'participantes') ? captureParticipantesFormState() : null;
+    var joinInput = document.getElementById('f-joincode');
+    var preservedJoin = joinInput ? joinInput.value : '';
     renderSync();
 
     document.querySelectorAll('.tab-btn').forEach(function(btn){
@@ -575,6 +632,38 @@ import { firebaseConfig } from "./firebase-config.js";
     if(activeTab === 'resumen') bindResumenEvents();
     if(activeTab === 'gastos'){ bindGastosEvents(); restoreGastosFormState(preservedGastos); }
     if(activeTab === 'participantes'){ bindParticipantesEvents(); restoreParticipantesFormState(preservedNewPerson); }
+    bindJoinEvents(preservedJoin);
+  }
+
+  // Cartel para quien no es del grupo: puede mirar todo, pero para editar necesita el código.
+  function renderJoinCard(){
+    if(canEdit) return '';
+    return '<div class="card join-card">' +
+      '<h2>🔒 Solo lectura</h2>' +
+      '<p class="join-text">Podés mirar todo. Para cargar o editar gastos, ingresá el código del grupo (se pide una sola vez por dispositivo).</p>' +
+      '<div class="add-person">' +
+        '<input type="password" id="f-joincode" placeholder="Código del grupo" autocomplete="off"'+(joining?' disabled':'')+'>' +
+        '<button type="button" class="btn-primary" id="joinBtn"'+(joining?' disabled':'')+'>'+(joining?'Validando…':'Entrar')+'</button>' +
+      '</div>' +
+      (joinNotice ? '<div class="form-err" style="margin-top:8px">'+esc(joinNotice)+'</div>' : '') +
+    '</div>';
+  }
+  function renderReadOnlyBanner(){
+    if(canEdit) return '';
+    return '<div class="notice-info readonly-banner"><span>🔒 Estás viendo en modo solo lectura.</span>' +
+      '<button type="button" class="btn-secondary" id="goJoinBtn">Soy del grupo</button></div>';
+  }
+  function bindJoinEvents(preserved){
+    var input = document.getElementById('f-joincode');
+    if(input && preserved) input.value = preserved;
+    var btn = document.getElementById('joinBtn');
+    if(btn) btn.onclick = function(){ joinGroup(document.getElementById('f-joincode').value); };
+    if(input) input.onkeydown = function(e){ if(e.key === 'Enter'){ e.preventDefault(); btn.click(); } };
+    var go = document.getElementById('goJoinBtn');
+    if(go) go.onclick = function(){
+      activeTab = 'gastos'; render();
+      var i = document.getElementById('f-joincode'); if(i) i.focus();
+    };
   }
 
   // Indicador de arriba a la derecha: Sincronizado / Sin conexión / Guardando… / Modo local
@@ -642,7 +731,7 @@ import { firebaseConfig } from "./firebase-config.js";
       return '<div class="settle-row"><b>'+esc(m.from)+'</b><span class="arrow">→</span><b>'+esc(m.to)+'</b><span class="amt num">'+fmt(m.amount)+'</span></div>';
     }).join('') : '<div class="empty-note">Las cuentas ya están saldadas. Nadie le debe nada a nadie.</div>';
 
-    return renderLocalModeNotice() +
+    return renderLocalModeNotice() + renderReadOnlyBanner() +
       '<div class="card total-tile"><span class="label">Total gastado en el viaje</span><span class="amount num">'+fmt(grandTotal)+'</span></div>' +
       '<div class="card"><h2>Por categoría</h2>'+barsHtml+'</div>' +
       '<div class="card"><h2>Saldo de cada uno</h2><div class="balances-grid">'+(balancesHtml || '<div class="empty-note">Todavía no hay participantes cargados.</div>')+'</div></div>' +
@@ -705,25 +794,40 @@ import { firebaseConfig } from "./firebase-config.js";
         '</div>' +
         '<div class="exp-right">' +
           '<div class="exp-amt num">'+fmt(e.amount)+'</div>' +
-          '<div class="exp-actions">' +
+          (canEdit ? '<div class="exp-actions">' +
             '<button class="icon-btn" data-edit="'+e.id+'">editar</button>' +
             '<button class="icon-btn danger" data-delete="'+e.id+'">'+(confirming?'¿seguro?':'borrar')+'</button>' +
-          '</div>' +
+          '</div>' : '') +
         '</div>' +
       '</div>';
     }).join('') : '<div class="empty-note">No hay gastos en esta categoría todavía.</div>';
 
-    return renderLocalModeNotice() + renderNotice(gastosNotice) +
+    return renderLocalModeNotice() + renderNotice(gastosNotice) + renderJoinCard() +
       '<div class="card">'+chipsHtml+'</div>' +
-      '<div class="card"><h2>'+(editing?'Editar gasto':'Nuevo gasto')+'</h2>'+formHtml+'</div>' +
+      (canEdit ? '<div class="card"><h2>'+(editing?'Editar gasto':'Nuevo gasto')+'</h2>'+formHtml+'</div>' : '') +
       '<div class="card"><h2>Historial</h2><div class="expense-list">'+rowsHtml+'</div></div>';
   }
 
   function renderParticipantes(){
     var d = configDraft || config;
     var peopleHtml = (d.participants||[]).map(function(n){
-      return '<span class="person-chip">'+esc(n)+'<button type="button" data-remove-person="'+esc(n)+'" aria-label="Quitar">×</button></span>';
+      return '<span class="person-chip"'+(canEdit?'':' style="padding-right:13px"')+'>'+esc(n)+
+        (canEdit ? '<button type="button" data-remove-person="'+esc(n)+'" aria-label="Quitar">×</button>' : '') + '</span>';
     }).join('') || '<span class="empty-note">Todavía no cargaste a nadie.</span>';
+
+    // Sin permiso: mismos datos, pero sin campos editables ni botones.
+    if(!canEdit){
+      return renderLocalModeNotice() + renderJoinCard() +
+        '<div class="card"><h2>Datos del evento</h2>' +
+          '<div class="field-row">' +
+            '<label class="field">Nombre del evento<input type="text" value="'+esc(d.eventName||'')+'" disabled></label>' +
+            '<label class="field">Moneda<input type="text" value="'+esc(d.currency||'$')+'" disabled></label>' +
+          '</div>' +
+        '</div>' +
+        '<div class="card"><h2>Participantes ('+(d.participants||[]).length+')</h2>' +
+          '<div class="people-list">'+peopleHtml+'</div>' +
+        '</div>';
+    }
 
     return renderLocalModeNotice() + renderNotice(participantesNotice) +
       '<div class="card">' +
@@ -813,6 +917,7 @@ import { firebaseConfig } from "./firebase-config.js";
   }
 
   function bindParticipantesEvents(){
+    if(!canEdit) return;
     if(!configDraft) configDraft = clone(config);
     document.getElementById('f-eventname').oninput = function(e){ configDraft.eventName = e.target.value; draftDirty = true; };
     document.getElementById('f-currency').oninput = function(e){ configDraft.currency = e.target.value || '$'; draftDirty = true; };
